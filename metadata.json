@@ -1,0 +1,6 @@
+{
+  "name": "AI Bounty Radar: Autonomous Hackathon & Bug Bounty Engine",
+  "description": "Global autonomous radar, challenge interpreter, and competitor engine for AI hackathons, Google VRP bug bounties, and security challenges.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

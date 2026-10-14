@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { TargetEvent, ChallengeSpec } from '../types/radar';
-import { Sparkles, ArrowRight, ShieldAlert, CheckCircle, RefreshCw, Layers, FileCode2 } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldAlert, CheckCircle, RefreshCw, Layers, FileCode2, Binary } from 'lucide-react';
+import { playTactileClick, playDeployChime } from '../utils/audio';
+import { safeFetchJson } from '../utils/fallbackGenerators';
 
 interface ChallengeStudioViewProps {
   activeTarget: TargetEvent;
@@ -46,12 +48,19 @@ export const ChallengeStudioView: React.FC<ChallengeStudioViewProps> = ({
       stack: 'Node.js · Streaming Workers · Schema Enforcement',
       desc: 'Real-time multi-source data synthesis with cryptographic verification and zero-latency caching.',
     },
+    {
+      id: 'solidity_agent_vault',
+      name: 'ZK & Smart Contract Security Agent',
+      stack: 'TypeScript · Viem · Solidity · ZK Proofs',
+      desc: 'Cryptographic execution receipts and autonomous threshold signature verification loops.',
+    },
   ];
 
   const handleRunInterpreter = async () => {
+    playTactileClick();
     setIsInterpreting(true);
     try {
-      const res = await fetch('/api/radar/interpret', {
+      const res = await safeFetchJson<{ spec: ChallengeSpec }>('/api/radar/interpret', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -60,12 +69,39 @@ export const ChallengeStudioView: React.FC<ChallengeStudioViewProps> = ({
           sourceUrl: activeTarget.sourceUrl,
         }),
       });
-      const data = await res.json();
-      if (data.spec) {
-        onUpdateSpec(data.spec);
-        if (data.spec.suggestedArchetype) {
-          setSelectedArchetype(data.spec.suggestedArchetype);
+
+      if (res.ok && res.data?.spec) {
+        onUpdateSpec(res.data.spec);
+        if (res.data.spec.suggestedArchetype) {
+          setSelectedArchetype(res.data.spec.suggestedArchetype);
         }
+        playDeployChime();
+      } else {
+        // Fallback spec extraction
+        const fallbackSpec: ChallengeSpec = {
+          title: activeTarget.title,
+          platform: activeTarget.platform,
+          category: activeTarget.category || 'ai',
+          theme: activeTarget.theme,
+          prizePool: activeTarget.prizePool,
+          deadline: activeTarget.deadline || '2026-12-01',
+          allowedTech: ['TypeScript', 'Node.js', '@google/genai', 'Docker'],
+          requiredDeliverables: ['GitHub Repository', 'Architecture Diagram', 'Live Service Demo'],
+          judgingCriteria: ['Technical Depth', 'Polish', 'Innovation', 'Real Verification'],
+          constraints: ['Production TypeScript', 'Deterministic Invariants'],
+          submissionFormat: {
+            needsRepoUrl: true,
+            needsDemoUrl: true,
+            needsDescriptionText: true,
+            needsVideo: true,
+            needsPoc: activeTarget.category === 'vrp_security',
+          },
+          suggestedArchetype: activeTarget.category === 'vrp_security' ? 'security_vrp_poc' : 'multi_agent_orchestrator',
+          summary: `High-impact competitive implementation for ${activeTarget.title}.`,
+          noveltyAngle: 'Zero-mock sub-second streaming with deterministic SHA-256 receipts.',
+        };
+        onUpdateSpec(fallbackSpec);
+        playDeployChime();
       }
     } catch (err) {
       console.error('Interpreter error:', err);
@@ -104,8 +140,11 @@ export const ChallengeStudioView: React.FC<ChallengeStudioViewProps> = ({
           </button>
 
           <button
-            onClick={() => onProceedToPipeline(selectedArchetype, customDirectives)}
-            className="px-4 py-1.5 text-xs font-semibold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-md transition-colors inline-flex items-center gap-1.5"
+            onClick={() => {
+              playTactileClick();
+              onProceedToPipeline(selectedArchetype, customDirectives);
+            }}
+            className="px-4 py-1.5 text-xs font-semibold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-md transition-colors inline-flex items-center gap-1.5 shadow-sm shadow-cyan-900/30"
           >
             <span>Proceed to Code Generator</span>
             <ArrowRight className="w-3.5 h-3.5" />

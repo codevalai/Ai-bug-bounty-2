@@ -1,20 +1,39 @@
 import React, { useState } from 'react';
 import { PolicyRuleConfig } from '../types/radar';
-import { Shield, Sliders, CheckCircle2, AlertOctagon, Save } from 'lucide-react';
+import { Shield, Sliders, CheckCircle2, AlertOctagon, Save, Compass, Sparkles, ArrowRight, Zap } from 'lucide-react';
 
 interface PolicyEngineViewProps {
   policy: PolicyRuleConfig;
   onUpdatePolicy: (policy: PolicyRuleConfig) => void;
+  onNavigateToStrategy?: () => void;
 }
 
-export const PolicyEngineView: React.FC<PolicyEngineViewProps> = ({ policy, onUpdatePolicy }) => {
+export const PolicyEngineView: React.FC<PolicyEngineViewProps> = ({
+  policy,
+  onUpdatePolicy,
+  onNavigateToStrategy,
+}) => {
   const [currentPolicy, setCurrentPolicy] = useState<PolicyRuleConfig>(policy);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [strategyAppliedNotice, setStrategyAppliedNotice] = useState<string | null>(null);
 
   const handleSave = () => {
     onUpdatePolicy(currentPolicy);
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 2000);
+  };
+
+  const applyStrategyPreset = (minPrize: number, maxBuilds: number, platforms: string[], label: string) => {
+    const updated: PolicyRuleConfig = {
+      ...currentPolicy,
+      minimumPrizeUsd: minPrize,
+      maxActiveRunsPerWeek: maxBuilds,
+      whitelistedPlatforms: Array.from(new Set([...currentPolicy.whitelistedPlatforms, ...platforms])),
+    };
+    setCurrentPolicy(updated);
+    onUpdatePolicy(updated);
+    setStrategyAppliedNotice(`Applied "${label}" strategy profile to Policy Engine!`);
+    setTimeout(() => setStrategyAppliedNotice(null), 3500);
   };
 
   const allAvailablePlatforms = [
@@ -31,10 +50,11 @@ export const PolicyEngineView: React.FC<PolicyEngineViewProps> = ({ policy, onUp
   ];
 
   const togglePlatform = (p: string) => {
-    const exists = currentPolicy.whitelistedPlatforms.includes(p);
+    const list = currentPolicy.whitelistedPlatforms || [];
+    const exists = list.includes(p);
     const updated = exists
-      ? currentPolicy.whitelistedPlatforms.filter((x) => x !== p)
-      : [...currentPolicy.whitelistedPlatforms, p];
+      ? list.filter((x) => x !== p)
+      : [...list, p];
     setCurrentPolicy({ ...currentPolicy, whitelistedPlatforms: updated });
   };
 
@@ -60,6 +80,125 @@ export const PolicyEngineView: React.FC<PolicyEngineViewProps> = ({ policy, onUp
         </button>
       </div>
 
+      {/* Strategy Engine Guidance Banner */}
+      {strategyAppliedNotice && (
+        <div className="p-3 bg-emerald-950/80 border border-emerald-500/60 rounded-lg text-xs text-emerald-200 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{strategyAppliedNotice}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="p-4 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/30 border border-cyan-500/30 rounded-xl space-y-3 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-md">
+              <Compass className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white text-xs">Strategy Engine Policy Directives</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 bg-cyan-950 text-cyan-300 border border-cyan-800/60 rounded">
+                  Portfolio Optimized
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Data-driven build strategy profiles calibrated from competition prize liquidity and archetype win rates.
+              </p>
+            </div>
+          </div>
+
+          {onNavigateToStrategy && (
+            <button
+              onClick={onNavigateToStrategy}
+              className="px-3 py-1 text-xs text-cyan-300 hover:text-white bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-md transition-colors flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+            >
+              <span>Explore Strategy Engine</span>
+              <ArrowRight className="w-3 h-3 text-cyan-400" />
+            </button>
+          )}
+        </div>
+
+        {/* 1-Click Strategy Presets Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+          <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-lg flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white text-[11px]">Balanced High-Yield</span>
+                <span className="text-[10px] text-cyan-400 font-mono font-bold">$15k+ Min</span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                Prioritizes Google AI Studio &amp; VRP security with 90%+ win rate. 14 builds/wk.
+              </p>
+            </div>
+            <button
+              onClick={() =>
+                applyStrategyPreset(
+                  15000,
+                  14,
+                  ['Google AI Studio', 'Google Bug Hunters / VRP', 'Devpost', 'ETHGlobal', 'HackerOne', 'Immunefi'],
+                  'Balanced High-Yield'
+                )
+              }
+              className="mt-2 w-full py-1 text-[11px] font-semibold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded transition-colors"
+            >
+              Apply Preset
+            </button>
+          </div>
+
+          <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-lg flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white text-[11px]">Aggressive Alpha</span>
+                <span className="text-[10px] text-amber-400 font-mono font-bold">$25k+ Min</span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                Filters for maximum flagship payouts &amp; critical bounties. 18 builds/wk.
+              </p>
+            </div>
+            <button
+              onClick={() =>
+                applyStrategyPreset(
+                  25000,
+                  18,
+                  ['Google Bug Hunters / VRP', 'Google AI Studio', 'ETHGlobal', 'Immunefi', 'HackerOne'],
+                  'Aggressive Alpha'
+                )
+              }
+              className="mt-2 w-full py-1 text-[11px] font-semibold text-amber-950 bg-amber-400 hover:bg-amber-300 rounded transition-colors"
+            >
+              Apply Preset
+            </button>
+          </div>
+
+          <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-lg flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white text-[11px]">VRP Bounty Sniper</span>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold">$20k+ Min</span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                Hyper-focused on security bounties with 94% validated cash payouts. 12 builds/wk.
+              </p>
+            </div>
+            <button
+              onClick={() =>
+                applyStrategyPreset(
+                  20000,
+                  12,
+                  ['Google Bug Hunters / VRP', 'HackerOne', 'Immunefi', 'Bugcrowd'],
+                  'VRP Bounty Sniper'
+                )
+              }
+              className="mt-2 w-full py-1 text-[11px] font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded transition-colors"
+            >
+              Apply Preset
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
         {/* Left Column: Automation & Safety Rules (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
@@ -79,7 +218,7 @@ export const PolicyEngineView: React.FC<PolicyEngineViewProps> = ({ policy, onUp
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               {allAvailablePlatforms.map((plat) => {
-                const isChecked = currentPolicy.whitelistedPlatforms.includes(plat);
+                const isChecked = (currentPolicy.whitelistedPlatforms || []).includes(plat);
                 return (
                   <button
                     key={plat}

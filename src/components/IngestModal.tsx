@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { TargetEvent, TargetCategory } from '../types/radar';
+import { TargetEvent, TargetCategory, ChallengeSpec } from '../types/radar';
 import { X, Sparkles, Globe, Link2, FileText } from 'lucide-react';
+import { safeFetchJson } from '../utils/fallbackGenerators';
 
 interface IngestModalProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ export const IngestModal: React.FC<IngestModalProps> = ({ isOpen, onClose, onTar
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/radar/interpret', {
+      const res = await safeFetchJson<{ spec: ChallengeSpec }>('/api/radar/interpret', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -33,8 +34,7 @@ export const IngestModal: React.FC<IngestModalProps> = ({ isOpen, onClose, onTar
         }),
       });
 
-      const data = await res.json();
-      const spec = data.spec;
+      const spec = res.data?.spec;
 
       const newTarget: TargetEvent = {
         id: `custom-target-${Date.now()}`,
@@ -47,7 +47,7 @@ export const IngestModal: React.FC<IngestModalProps> = ({ isOpen, onClose, onTar
         prizeAmountUsd: 50000,
         deadline: spec?.deadline || '2026-12-01',
         status: 'live',
-        isGoogleTarget: (platform + titleHint).toLowerCase().includes('google'),
+        isGoogleTarget: `${platform || ''} ${titleHint || ''}`.toLowerCase().includes('google'),
         stage: 'interpreted',
         spec: spec || undefined,
         rawText,

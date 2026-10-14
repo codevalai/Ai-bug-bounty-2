@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TargetEvent } from '../types/radar';
 import { Network, Database, Layers, Trophy, Sparkles, Filter, ChevronRight } from 'lucide-react';
+import { playTactileClick } from '../utils/audio';
 
 interface KnowledgeGraphViewProps {
   targets: TargetEvent[];
@@ -41,9 +42,12 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({ targets,
   ];
 
   const activeClusterData = clusters.find((c) => c.id === selectedCluster) || clusters[0];
-  const matchingTargets = targets.filter((t) =>
-    activeClusterData.platforms.some((p) => t.platform.toLowerCase().includes(p.toLowerCase()))
-  );
+  const matchingTargets = targets.filter((t) => {
+    const platforms = activeClusterData?.platforms || [];
+    return platforms.some((p) =>
+      (t.platform || '').toLowerCase().includes((p || '').toLowerCase())
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -64,7 +68,10 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({ targets,
           return (
             <div
               key={cluster.id}
-              onClick={() => setSelectedCluster(cluster.id)}
+              onClick={() => {
+                playTactileClick();
+                setSelectedCluster(cluster.id);
+              }}
               className={`p-4 rounded-lg border cursor-pointer transition-all text-xs ${
                 isSelected
                   ? 'bg-slate-800/90 border-cyan-500/70 shadow-md'

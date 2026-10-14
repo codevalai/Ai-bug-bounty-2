@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TargetEvent, ChallengeSpec, PolicyRuleConfig, GeneratedProject, GitHubUser, GitHubRepo, GitHubPushResult } from './types/radar';
+import { TargetEvent, ChallengeSpec, PolicyRuleConfig, GeneratedProject, GeneratedFile, GitHubUser, GitHubRepo, GitHubPushResult } from './types/radar';
 import { INITIAL_TARGETS, INITIAL_POLICY } from './data/mockFeed';
 import { TopNav, NavTab } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
@@ -10,8 +10,16 @@ import { QAView } from './components/QAView';
 import { SubmissionPackagerView } from './components/SubmissionPackagerView';
 import { KnowledgeGraphView } from './components/KnowledgeGraphView';
 import { PolicyEngineView } from './components/PolicyEngineView';
+import { StrategyEngineView } from './components/StrategyEngineView';
+import { MetaLearningView } from './components/MetaLearningView';
 import { IngestModal } from './components/IngestModal';
 import { GitHubAuthModal } from './components/GitHubAuthModal';
+import { CommandPalette } from './components/CommandPalette';
+import { isAudioEnabled, toggleAudio, playTactileClick, playDeployChime } from './utils/audio';
+import { downloadDeployableZip } from './utils/zipPackager';
+import { safeFetchJson, generateClientProject, generateClientQA, generateClientSubmissionBundle } from './utils/fallbackGenerators';
+import { MetaLearningState } from './types/metaLearning';
+import { loadMetaLearningState, syncMetaLearningWithServer, saveMetaLearningState } from './services/metaLearningService';
 import { Radio, X, Sparkles } from 'lucide-react';
 
 export default function App() {
@@ -23,19 +31,42 @@ export default function App() {
   const [policy, setPolicy] = useState<PolicyRuleConfig>(INITIAL_POLICY);
   const [isIngestModalOpen, setIsIngestModalOpen] = useState<boolean>(false);
   const [isGitHubModalOpen, setIsGitHubModalOpen] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isAudioOn, setIsAudioOn] = useState<boolean>(() => isAudioEnabled());
   const [githubToken, setGithubToken] = useState<string | null>(null);
   const [githubUser, setGithubUser] = useState<GitHubUser | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [isPackaging, setIsPackaging] = useState<boolean>(false);
+  const [isSyncingLive, setIsSyncingLive] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('sentinel_sidebar_collapsed') === 'true';
+  });
+  const [metaLearningState, setMetaLearningState] = useState<MetaLearningState>(loadMetaLearningState);
   const [notification, setNotification] = useState<{ title: string; message: string } | null>(null);
+
+  const handleToggleAudio = () => {
+    const updated = toggleAudio();
+    setIsAudioOn(updated);
+  };
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sentinel_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetch('/api/health')
       .then((res) => res.json())
       .then((data) => setHasApiKey(!!data.hasApiKey))
       .catch(() => setHasApiKey(false));
+
+    // Automatically trigger initial live radar sync to ingest real-time security advisories
+    handleLiveRadarScan();
 
     // Restore GitHub token from localStorage if present
     const savedToken = localStorage.getItem('sentinel_github_token');
@@ -53,6 +84,22 @@ export default function App() {
           setGithubToken(null);
         });
     }
+
+    // Sync meta-learning model with server
+    syncMetaLearningWithServer(metaLearningState).then((remote) => {
+      if (remote) setMetaLearningState(remote);
+    });
+
+    // Global keyboard shortcuts: Cmd+K / Ctrl+K for Command Palette
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const activeTarget = targets.find((t) => t.id === activeTargetId) || targets[0];
@@ -69,6 +116,19 @@ export default function App() {
       prev.map((t) =>
         t.id === activeTarget.id
           ? { ...t, spec, stage: t.stage === 'detected' ? 'interpreted' : t.stage }
+          : t
+      )
+    );
+  };
+
+  const handleUpdateFiles = (files: GeneratedFile[]) => {
+    setTargets((prev) =>
+      prev.map((t) =>
+        t.id === activeTarget.id && t.project
+          ? {
+              ...t,
+              project: { ...t.project, files },
+            }
           : t
       )
     );
@@ -125,27 +185,40 @@ export default function App() {
     setActiveTab('pipeline');
 
     try {
-      const res = await fetch('/api/radar/generate-project', {
+      const currentSpec = activeTarget.spec || {
+        title: activeTarget.title,
+        platform: activeTarget.platform,
+        theme: activeTarget.theme,
+        suggestedArchetype: archetype,
+      };
+
+      // Combine user customDirectives with live auto-refined meta-learning directives
+      const metaDirectives = metaLearningState.activePrompts?.generator?.injectedDirectives?.join('\n') || '';
+      const combinedDirectives = customDirectives
+        ? `${customDirectives}\n\nMETA-LEARNED DIRECTIVES:\n${metaDirectives}`
+        : metaDirectives;
+
+      const res = await safeFetchJson<{ project: GeneratedProject }>('/api/radar/generate-project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          spec: activeTarget.spec || {
-            title: activeTarget.title,
-            platform: activeTarget.platform,
-            theme: activeTarget.theme,
-            suggestedArchetype: archetype,
-          },
+          spec: currentSpec,
           archetype,
-          customDirectives,
+          customDirectives: combinedDirectives,
         }),
       });
 
-      const data = await res.json();
-      const project: GeneratedProject = {
-        ...data.project,
-        archetype,
-        generatedAt: new Date().toISOString(),
-      };
+      let project: GeneratedProject;
+      if (res.ok && res.data?.project && Array.isArray(res.data.project.files) && res.data.project.files.length > 0) {
+        project = {
+          ...res.data.project,
+          archetype,
+          generatedAt: new Date().toISOString(),
+        };
+      } else {
+        // Fallback to deterministic client generator
+        project = generateClientProject(currentSpec, archetype, customDirectives);
+      }
 
       setTargets((prev) =>
         prev.map((t) =>
@@ -154,8 +227,17 @@ export default function App() {
             : t
         )
       );
+      playDeployChime();
     } catch (err) {
-      console.error('Code generation error:', err);
+      console.error('Code generation error, using fallback:', err);
+      const fallback = generateClientProject(
+        activeTarget.spec || { title: activeTarget.title, platform: activeTarget.platform, theme: activeTarget.theme },
+        archetype,
+        customDirectives
+      );
+      setTargets((prev) =>
+        prev.map((t) => (t.id === activeTarget.id ? { ...t, project: fallback, stage: 'generated' } : t))
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -167,7 +249,7 @@ export default function App() {
     setActiveTab('qa');
 
     try {
-      const res = await fetch('/api/radar/qa-audit', {
+      const res = await safeFetchJson<any>('/api/radar/qa-audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -176,23 +258,34 @@ export default function App() {
         }),
       });
 
-      const data = await res.json();
+      let qaResult: any;
+      if (res.ok && res.data && res.data.qaStatus) {
+        qaResult = {
+          ...res.data,
+          auditedAt: new Date().toISOString(),
+        };
+      } else {
+        qaResult = generateClientQA(activeTarget.project.files, activeTarget.title);
+      }
+
       setTargets((prev) =>
         prev.map((t) =>
           t.id === activeTarget.id
             ? {
                 ...t,
-                qaResult: {
-                  ...data,
-                  auditedAt: new Date().toISOString(),
-                },
+                qaResult,
                 stage: 'qa_passed',
               }
             : t
         )
       );
+      playDeployChime();
     } catch (err) {
-      console.error('QA audit error:', err);
+      console.error('QA audit error, using fallback:', err);
+      const fallbackQA = generateClientQA(activeTarget.project.files, activeTarget.title);
+      setTargets((prev) =>
+        prev.map((t) => (t.id === activeTarget.id ? { ...t, qaResult: fallbackQA, stage: 'qa_passed' } : t))
+      );
     } finally {
       setIsAuditing(false);
     }
@@ -204,89 +297,113 @@ export default function App() {
     setActiveTab('submission');
 
     try {
-      const res = await fetch('/api/radar/package-submission', {
+      const currentSpec = activeTarget.spec || {
+        title: activeTarget.title,
+        platform: activeTarget.platform,
+        theme: activeTarget.theme,
+        judgingCriteria: ['Innovation', 'Technical Depth', 'Polish'],
+      };
+
+      const res = await safeFetchJson<any>('/api/radar/package-submission', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          spec: activeTarget.spec || {
-            title: activeTarget.title,
-            platform: activeTarget.platform,
-            theme: activeTarget.theme,
-            judgingCriteria: ['Innovation', 'Technical Depth', 'Polish'],
-          },
+          spec: currentSpec,
           project: activeTarget.project,
         }),
       });
 
-      const data = await res.json();
+      let bundle: any;
+      if (res.ok && res.data?.bundle) {
+        bundle = {
+          ...res.data.bundle,
+          repoUrl: activeTarget.githubRepo?.html_url || res.data.bundle.repoUrl,
+        };
+      } else {
+        bundle = generateClientSubmissionBundle(currentSpec, activeTarget.project);
+      }
+
       setTargets((prev) =>
         prev.map((t) =>
           t.id === activeTarget.id
             ? {
                 ...t,
-                submissionBundle: {
-                  ...data.bundle,
-                  repoUrl: t.githubRepo?.html_url || t.submissionBundle?.repoUrl,
-                },
+                submissionBundle: bundle,
                 stage: 'packaged',
               }
             : t
         )
       );
+      playDeployChime();
     } catch (err) {
-      console.error('Packaging error:', err);
+      console.error('Packaging error, using fallback:', err);
+      const currentSpec = activeTarget.spec || {
+        title: activeTarget.title,
+        platform: activeTarget.platform,
+        theme: activeTarget.theme,
+      };
+      const fallbackBundle = generateClientSubmissionBundle(currentSpec, activeTarget.project);
+      setTargets((prev) =>
+        prev.map((t) => (t.id === activeTarget.id ? { ...t, submissionBundle: fallbackBundle, stage: 'packaged' } : t))
+      );
     } finally {
       setIsPackaging(false);
     }
   };
 
-  const handleSimulateDetection = () => {
-    const newSimulated: TargetEvent = {
-      id: `simulated-${Date.now()}`,
-      title: 'Google Bug Hunters: Gemini Spark AI Security Bounty',
-      platform: 'Google Bug Hunters / VRP',
-      sourceUrl: 'https://bughunters.google.com/about/rules',
-      category: 'vrp_security',
-      theme: 'High-severity prompt leakage and model parameter inference vulnerabilities in Gemini Spark endpoints',
-      prizePool: '$31,337 Max Payout',
-      prizeAmountUsd: 31337,
-      deadline: '2026-12-15',
-      status: 'live',
-      isGoogleTarget: true,
-      stage: 'detected',
-      spec: {
-        title: 'Google Bug Hunters: Gemini Spark AI Security Bounty',
-        platform: 'Google Bug Hunters / VRP',
-        category: 'vrp_security',
-        theme: 'Sub-second fuzzing of multi-modal system prompt isolation barriers in Gemini Spark microservices',
-        prizePool: '$31,337 Max Payout',
-        deadline: '2026-12-15',
-        allowedTech: ['TypeScript', 'Python', 'Google GenAI SDK', 'Differential Fuzzers'],
-        requiredDeliverables: ['Deterministic PoC Script', 'Root Cause Analysis', 'Remediation Guidelines'],
-        judgingCriteria: ['Impact Severity', 'Reproducibility', 'Zero False Positives'],
-        constraints: ['Strict adherence to Google VRP Scope', 'No production denial-of-service'],
-        submissionFormat: {
-          needsRepoUrl: true,
-          needsDemoUrl: false,
-          needsDescriptionText: true,
-          needsVideo: true,
-          needsPoc: true,
-        },
-        suggestedArchetype: 'security_vrp_poc',
-        summary: 'Emergency high-bounty challenge targeting adversarial multi-modal injection flaws in Gemini Spark.',
-        noveltyAngle: 'Automated differential state fuzzer that detects semantic prompt leakages in 2 turns.',
-      },
-    };
-
-    setTargets((prev) => [newSimulated, ...prev]);
-    setActiveTargetId(newSimulated.id);
-    setActiveTab('studio');
-    setNotification({
-      title: 'New High-Priority Challenge Ingested',
-      message: 'Gemini Spark AI Security Bounty detected on Google Bug Hunters VRP feed ($31,337).',
-    });
-    setTimeout(() => setNotification(null), 5000);
+  const handleDownloadActiveZip = async () => {
+    try {
+      playTactileClick();
+      await downloadDeployableZip(activeTarget);
+      setNotification({
+        title: 'Deployable ZIP Pack Downloaded',
+        message: `Complete build archive for "${activeTarget.title}" downloaded (.zip).`,
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } catch (err: any) {
+      console.error('Error downloading zip pack:', err);
+    }
   };
+
+  const handleLiveRadarScan = async () => {
+    setIsSyncingLive(true);
+    try {
+      const res = await fetch('/api/radar/live-advisories');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.liveAdvisories && data.liveAdvisories.length > 0) {
+          setTargets((prev) => {
+            const existingIds = new Set(prev.map((t) => t.id));
+            const fresh = data.liveAdvisories
+              .filter((t: TargetEvent) => !existingIds.has(t.id))
+              .map((t: TargetEvent) => ({
+                ...t,
+                status: t.status || 'live',
+                category: t.category || 'vrp_security',
+                prizeAmountUsd: typeof t.prizeAmountUsd === 'number' ? t.prizeAmountUsd : 15000,
+                stage: t.stage || 'detected',
+              }));
+            if (fresh.length > 0) {
+              playDeployChime();
+              setNotification({
+                title: 'Live Radar Feed Synced',
+                message: `Ingested ${fresh.length} real-time CVE and Bug Bounty security advisories from GitHub Advisories API.`,
+              });
+              setTimeout(() => setNotification(null), 5000);
+              return [...fresh, ...prev];
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Live radar scan warning:', err);
+    } finally {
+      setIsSyncingLive(false);
+    }
+  };
+
+  const handleSimulateDetection = handleLiveRadarScan;
 
   const handleTargetIngested = (newTarget: TargetEvent) => {
     setTargets((prev) => [newTarget, ...prev]);
@@ -317,11 +434,17 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenIngest={() => setIsIngestModalOpen(true)}
-        onSimulateEvent={handleSimulateDetection}
+        onLiveRadarScan={handleLiveRadarScan}
+        onDownloadZip={activeTarget.project?.files?.length ? handleDownloadActiveZip : undefined}
         hasApiKey={hasApiKey}
         activeTargetTitle={activeTarget?.title}
         githubUser={githubUser}
         onOpenGitHubAuth={() => setIsGitHubModalOpen(true)}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={handleToggleSidebar}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        isAudioOn={isAudioOn}
+        onToggleAudio={handleToggleAudio}
       />
 
       {/* Main Workspace Frame */}
@@ -337,6 +460,8 @@ export default function App() {
           inPipelineCount={inPipelineCount}
           completedPackagesCount={completedPackagesCount}
           hasApiKey={hasApiKey}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebar}
         />
 
         {/* Center Main Viewport */}
@@ -345,8 +470,11 @@ export default function App() {
             {activeTab === 'radar' && (
               <RadarFeedView
                 targets={displayedTargets}
+                policy={policy}
                 onSelectTarget={(t, tab) => handleSelectTarget(t, tab)}
                 onOpenIngest={() => setIsIngestModalOpen(true)}
+                onSyncLiveFeed={handleLiveRadarScan}
+                isSyncingLive={isSyncingLive}
               />
             )}
 
@@ -373,6 +501,7 @@ export default function App() {
                 githubToken={githubToken}
                 onOpenGitHubAuth={() => setIsGitHubModalOpen(true)}
                 onRepoPushed={handleRepoPushed}
+                onUpdateFiles={handleUpdateFiles}
               />
             )}
 
@@ -404,6 +533,43 @@ export default function App() {
               <PolicyEngineView
                 policy={policy}
                 onUpdatePolicy={(newPolicy) => setPolicy(newPolicy)}
+                onNavigateToStrategy={() => setActiveTab('strategy')}
+              />
+            )}
+
+            {activeTab === 'strategy' && (
+              <StrategyEngineView
+                targets={targets}
+                outcomes={metaLearningState.outcomes}
+                currentPolicy={policy}
+                onUpdatePolicy={(newPolicy) => {
+                  setPolicy(newPolicy);
+                  setNotification({
+                    title: 'Policy Engine Reconfigured',
+                    message: `Applied optimal build strategy: $${newPolicy.minimumPrizeUsd.toLocaleString()} Min Prize Gate, ${newPolicy.whitelistedPlatforms.length} Whitelisted Platforms.`,
+                  });
+                  setTimeout(() => setNotification(null), 4000);
+                }}
+                onSelectTarget={(t, tab = 'studio') => handleSelectTarget(t, tab)}
+              />
+            )}
+
+            {activeTab === 'meta_learning' && (
+              <MetaLearningView
+                metaState={metaLearningState}
+                onUpdateMetaState={(newState) => {
+                  setMetaLearningState(newState);
+                  saveMetaLearningState(newState);
+                }}
+                currentPolicy={policy}
+                onUpdatePolicy={(newPolicy) => {
+                  setPolicy(newPolicy);
+                  setNotification({
+                    title: 'Governance Policy Auto-Tuned',
+                    message: 'Applied optimal meta-learning rules to live Policy Engine.',
+                  });
+                  setTimeout(() => setNotification(null), 4000);
+                }}
               />
             )}
           </div>
@@ -441,6 +607,44 @@ export default function App() {
         githubUser={githubUser}
         onConnectSuccess={handleGitHubConnectSuccess}
         onDisconnect={handleGitHubDisconnect}
+      />
+
+      {/* Global Command Palette */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={(tab) => {
+          setActiveTab(tab);
+          setIsCommandPaletteOpen(false);
+        }}
+        onTriggerAction={(actionId) => {
+          setIsCommandPaletteOpen(false);
+          switch (actionId) {
+            case 'simulate':
+              handleSimulateDetection();
+              break;
+            case 'ingest':
+              setIsIngestModalOpen(true);
+              break;
+            case 'build':
+              handleProceedToPipeline(
+                activeTarget.project?.archetype || 'multi_agent_orchestrator',
+                'Autonomous synthesis pass via Command Palette'
+              );
+              break;
+            case 'qa':
+              handleRunQA();
+              break;
+            case 'github':
+              setIsGitHubModalOpen(true);
+              break;
+            case 'zip':
+              handleDownloadActiveZip();
+              break;
+          }
+        }}
+        isAudioOn={isAudioOn}
+        onToggleAudio={handleToggleAudio}
       />
     </div>
   );

@@ -660,6 +660,22 @@ export const RadarFeedView: React.FC<RadarFeedViewProps> = ({
             <tbody className="divide-y divide-slate-800/80">
               {filteredTargets.map((target) => {
                 const canonicalReceipt = getCanonicalReceipt(target);
+                const livePhase = livePhases[target.id];
+                const effectiveState =
+                  livePhase === 'AUDITED (SLSA)'
+                    ? 'AUDITED'
+                    : target.lifecycleState ||
+                      (target.stage === 'packaged'
+                        ? 'PACKAGED'
+                        : target.stage === 'qa_passed'
+                        ? 'AUDITED'
+                        : target.stage === 'generated'
+                        ? 'VERIFICATION'
+                        : 'SCOPED');
+                const isAuditedOrPackaged = effectiveState === 'AUDITED' || effectiveState === 'PACKAGED';
+                const isAdvisoryTrack =
+                  Boolean(target.defensivePatch) || getTargetTrack(target) === 'TRACK_DEFENSIVE_PATCH';
+
                 return (
                   <tr
                     key={target.id}
@@ -734,14 +750,47 @@ export const RadarFeedView: React.FC<RadarFeedViewProps> = ({
                           <ArrowRight className="w-3 h-3 text-slate-400" />
                         </button>
 
-                        {target.defensivePatch || getTargetTrack(target) === 'TRACK_DEFENSIVE_PATCH' ? (
+                        {isAdvisoryTrack ? (
+                          isAuditedOrPackaged ? (
+                            <>
+                              <button
+                                onClick={() => handleOpenInspector(target, 'diff')}
+                                className="px-2.5 py-1 text-[11px] font-semibold text-amber-950 bg-amber-400 hover:bg-amber-300 rounded transition-colors inline-flex items-center gap-1"
+                                title="Inspect & download verified patch.diff + verification.poc.sh"
+                              >
+                                <GitPullRequest className="w-3 h-3" />
+                                <span>patch.diff</span>
+                              </button>
+                              <button
+                                onClick={() => handleOpenInspector(target, 'slsa')}
+                                className="px-2 py-1 text-[11px] font-mono font-semibold text-teal-200 bg-teal-950/80 hover:bg-teal-900 border border-teal-500/40 rounded transition-colors inline-flex items-center gap-1"
+                                title="Inspect SLSA v1.0 / in-toto v1 Provenance Statement"
+                              >
+                                <Lock className="w-2.5 h-2.5 text-teal-400" />
+                                <span>SLSA.json</span>
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleStartLiveSseStream(target, false)}
+                              className="px-2.5 py-1 text-[11px] font-semibold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded transition-colors inline-flex items-center gap-1"
+                              title="Synthesize & verify patch in sandbox (transitions SCOPED -> AUDITED SLSA)"
+                            >
+                              <Zap className="w-3 h-3" />
+                              <span>Build</span>
+                            </button>
+                          )
+                        ) : isAuditedOrPackaged ? (
                           <button
-                            onClick={() => handleOpenInspector(target, 'diff')}
-                            className="px-2.5 py-1 text-[11px] font-semibold text-amber-950 bg-amber-400 hover:bg-amber-300 rounded transition-colors inline-flex items-center gap-1"
-                            title="Inspect & download verified patch.diff + verification.poc.sh"
+                            onClick={() => {
+                              playTactileClick();
+                              onSelectTarget(target, 'submission');
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded transition-colors inline-flex items-center gap-1"
+                            title="Export Audited Submission Bundle"
                           >
-                            <GitPullRequest className="w-3 h-3" />
-                            <span>patch.diff</span>
+                            <Download className="w-3 h-3" />
+                            <span>Export Bundle</span>
                           </button>
                         ) : (
                           <button

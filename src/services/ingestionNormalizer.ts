@@ -182,10 +182,19 @@ export function normalizeLiveAdvisory(raw: z.infer<typeof RawAdvisorySchema>): N
   // 0. Pass through Indirect Prompt Injection Firewall first
   const { sanitized, flaggedPatterns } = sanitizeUntrustedAdvisoryInput(raw.summary);
 
-  // 1. Strip Markdown headers (## Executive summary, ### Summary, etc.), inline formatting, and normalize whitespace
+  // 1. Strip Markdown headers (## Executive summary, ### Summary, etc.), Microsoft boilerplate lead-in, inline formatting, and normalize whitespace
+  const pkgPrefix =
+    raw.packageName && raw.packageName !== 'Core Library' && !sanitized.includes(raw.packageName)
+      ? `Vulnerability in ${raw.packageName} — `
+      : 'Vulnerability in ';
+
   const stripped = sanitized
+    .trim()
     .replace(/^#+\s*(Executive\s*summary|Summary|Overview|Description|Vulnerability\s*Details)\s*:?\s*/gi, '')
     .replace(/#+\s*(Executive\s*summary|Summary|Overview)\s*:?\s*/gi, '')
+    .trim()
+    .replace(/^Microsoft is releasing this security advisory to provide information about a vulnerability in\s*/i, pkgPrefix)
+    .replace(/Microsoft is releasing this security advisory to provide information about a vulnerability in\s*/gi, pkgPrefix)
     .replace(/[#_*`~>]/g, '')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/\s+/g, ' ')

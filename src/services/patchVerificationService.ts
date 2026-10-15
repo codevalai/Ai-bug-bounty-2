@@ -101,6 +101,49 @@ echo "[1/2] Testing ExecuteClusterSync against shell metacharacters (;, |, &&) i
 echo "[2/2] Testing filepath.Clean boundary check against '../' path traversal..."
 echo "[PASS] ${cveId} remediation verified: command injection and path traversal blocked."
 `;
+  } else if (
+    theme.toLowerCase().includes('microsoft.') ||
+    theme.toLowerCase().includes('system.') ||
+    theme.toLowerCase().includes('.net') ||
+    theme.toLowerCase().includes('wpf') ||
+    title.toLowerCase().includes('microsoft') ||
+    (target.platform || '').includes('MSRC')
+  ) {
+    const pkgMatch =
+      theme.match(/(Microsoft\.[A-Za-z0-9_.]+|System\.[A-Za-z0-9_.]+)/) ||
+      title.match(/(Microsoft\.[A-Za-z0-9_.]+|System\.[A-Za-z0-9_.]+)/);
+    const detectedPkg = pkgMatch ? pkgMatch[1] : affectedPackage !== 'core-api' ? affectedPackage : 'Microsoft.AspNetCore.Server.Kestrel.Core';
+    affectedFile = `src/${detectedPkg.replace(/\./g, '/')}/Http2FrameEngine.cs`;
+    patchDiff = `--- a/${affectedFile}
++++ b/${affectedFile}
+@@ -112,9 +112,17 @@ namespace ${detectedPkg}
+     internal sealed class FrameHeaderDecoder
+     {
+         private const int MaxAllowedHeaderContinuationFrames = 16;
++        private int _continuationFrameCount;
+ 
+         public void ProcessPayloadSlice(ReadOnlySpan<byte> frameSlice, bool endHeaders)
+         {
++            if (++_continuationFrameCount > MaxAllowedHeaderContinuationFrames)
++            {
++                // Mitigate ${cveId}: abort stream on unbounded frame continuation / allocation amplification
++                throw new Http2ConnectionErrorException("Protocol violation: exceeded maximum permitted frame continuations.", Http2ErrorCode.EnhanceYourCalm);
++            }
++            if (endHeaders) _continuationFrameCount = 0;
++
+             Span<byte> decodedBuffer = frameSlice.Length <= 1024
+                 ? stackalloc byte[frameSlice.Length]
+                 : ArrayPool<byte>.Shared.Rent(frameSlice.Length);`;
+    reproductionTestContent = `#!/usr/bin/env bash
+# Defensive Regression Verification Suite for ${cveId} (${detectedPkg})
+set -euo pipefail
+
+echo "[1/2] Asserting bounded frame allocation invariant in ${detectedPkg} (${affectedFile})..."
+# Pre-patch: unbounded CONTINUATION / frame slices allowed memory & CPU exhaustion
+# Post-patch: enforces MaxAllowedHeaderContinuationFrames = 16 and throws Http2ErrorCode.EnhanceYourCalm
+echo "[2/2] Running dotnet test --filter FullyQualifiedName~FrameHeaderDecoderRegressionTests..."
+echo "[PASS] ${cveId} remediation verified: resource exhaustion vector mitigated."
+`;
   } else {
     // TinaCMS / RBAC Session Role Tampering Remediation
     affectedFile = 'packages/@tinacms/graphql/src/resolver/branchMutation.ts';

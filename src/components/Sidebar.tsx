@@ -1,5 +1,4 @@
 import React from 'react';
-import { TargetCategory } from '../types/radar';
 import {
   Shield,
   Sparkles,
@@ -10,8 +9,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Activity,
-  Layers,
-  ChevronRight,
   Zap,
 } from 'lucide-react';
 
@@ -54,11 +51,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   if (isCollapsed) {
     return (
       <aside
-        className="w-16 shrink-0 border-r border-slate-800 bg-slate-950 flex flex-col justify-between py-3 px-2 text-slate-300 transition-all duration-200 select-none"
+        className="w-16 shrink-0 border-r border-slate-800 bg-slate-950 flex flex-col justify-between py-4 px-2 text-slate-300 transition-all duration-150 select-none"
         aria-label="Sidebar collapsed"
       >
         <div className="space-y-4 flex flex-col items-center">
-          {/* Expand Toggle Button */}
           {onToggleCollapse && (
             <button
               onClick={onToggleCollapse}
@@ -70,36 +66,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
-          {/* Compact Telemetry Icon with Tooltip */}
           <div
-            className="p-2 bg-slate-900/80 border border-slate-800 rounded-lg text-center cursor-default group relative"
+            className="p-2 bg-slate-900 border border-slate-800 rounded-lg text-center cursor-default"
             title={`Total Tracked: $${(totalPrizePoolUsd / 1000000).toFixed(2)}M across ${totalTargetsCount} targets (${inPipelineCount} in pipeline)`}
           >
             <Activity className="w-4 h-4 text-cyan-400 mx-auto" />
-            <span className="text-[10px] font-mono text-slate-300 block mt-0.5 font-bold">
+            <span className="text-[10px] font-mono tabular-nums text-slate-300 block mt-0.5 font-semibold">
               ${Math.round(totalPrizePoolUsd / 1000000)}M
             </span>
           </div>
 
-          {/* Google Ecosystem Focus Mini Toggle */}
           <button
             onClick={() => setShowGoogleOnly(!showGoogleOnly)}
-            className={`p-2 rounded-lg transition-all border relative flex items-center justify-center ${
+            className={`p-2 rounded-lg transition-colors border flex items-center justify-center ${
               showGoogleOnly
-                ? 'bg-cyan-950/70 border-cyan-500/70 text-cyan-300'
+                ? 'bg-cyan-950/70 border-cyan-500/60 text-cyan-300'
                 : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
-            title={`Google AI & VRP Focus: ${showGoogleOnly ? 'ON' : 'OFF'}`}
+            title={`Google AI & VRP Focus: ${showGoogleOnly ? 'Active' : 'Off'}`}
             aria-label="Toggle Google AI focus"
           >
             <Zap className={`w-4 h-4 ${showGoogleOnly ? 'text-cyan-400' : 'text-slate-400'}`} />
-            {showGoogleOnly && (
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 absolute top-1 right-1 shadow-[0_0_6px_rgba(34,211,238,0.9)]" />
-            )}
           </button>
 
-          {/* Category Icons Rail */}
-          <div className="w-full border-t border-slate-800/80 pt-3 flex flex-col items-center gap-1">
+          <div className="w-full border-t border-slate-800 pt-3 flex flex-col items-center gap-1">
             {categoryFilters.map((cat) => {
               const Icon = cat.icon;
               const isActive = selectedCategory === cat.id;
@@ -107,30 +97,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all relative ${
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
                     isActive
-                      ? 'bg-slate-800 text-cyan-300 shadow-sm border border-cyan-500/30'
+                      ? 'bg-slate-800 text-cyan-300 border border-slate-700'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                   }`}
                   title={cat.label}
                   aria-label={cat.label}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
-                  {isActive && (
-                    <span className="w-1 h-3 rounded-full bg-cyan-400 absolute left-0 top-1/2 -translate-y-1/2" />
-                  )}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Compact Footer Status */}
-        <div className="flex flex-col items-center gap-2 pt-3 border-t border-slate-800/80 text-[10px]">
-          <div
-            className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
-            title={hasApiKey ? 'Gemini 3.8 Flash API Active' : 'Autonomous Engine Active'}
-          />
+        <div className="flex flex-col items-center pt-3 border-t border-slate-800 text-[10px] font-mono text-slate-500">
+          <span>SLSA</span>
         </div>
       </aside>
     );
@@ -138,15 +121,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className="w-64 shrink-0 border-r border-slate-800 bg-slate-950 flex flex-col justify-between p-4 text-slate-300 transition-all duration-200 select-none"
+      className="w-64 shrink-0 border-r border-slate-800 bg-slate-950 flex flex-col justify-between p-4 text-slate-300 transition-all duration-150 select-none"
       aria-label="Sidebar expanded"
     >
       <div className="space-y-6">
-        {/* Radar Telemetry Header & Collapse Button */}
+        {/* Portfolio Liquidity Summary */}
         <div>
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Radar Telemetry
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-300">
+              Portfolio Overview
             </span>
             {onToggleCollapse && (
               <button
@@ -160,35 +143,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          <div className="space-y-2">
-            <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-lg">
-              <div className="text-xs text-slate-400">Total Tracked Bounties</div>
+          <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
+            <div>
+              <div className="text-xs text-slate-400">Tracked Prize Liquidity</div>
               <div className="text-xl font-bold text-white font-mono tabular-nums mt-0.5">
                 ${(totalPrizePoolUsd / 1000000).toFixed(2)}M
               </div>
-              <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-                <span>{totalTargetsCount} targets active</span>
-                <span className="text-cyan-400 font-mono tabular-nums">{inPipelineCount} in pipeline</span>
-              </div>
+            </div>
+            <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between font-mono tabular-nums">
+              <span>{totalTargetsCount} Indexed</span>
+              <span>·</span>
+              <span className="text-cyan-400">{inPipelineCount} Active</span>
+              <span>·</span>
+              <span className="text-emerald-400">{completedPackagesCount} Audited</span>
             </div>
           </div>
         </div>
 
-        {/* Quick Filter: Google Ecosystem Focus */}
+        {/* Ecosystem Focus Toggle */}
         <div>
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            Ecosystem Focus
+          <div className="text-xs font-semibold text-slate-300 mb-2">
+            Ecosystem Filter
           </div>
           <button
             onClick={() => setShowGoogleOnly(!showGoogleOnly)}
-            className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-between border ${
+            className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium transition-colors flex items-center justify-between border ${
               showGoogleOnly
                 ? 'bg-cyan-950/60 border-cyan-500/50 text-cyan-200'
-                : 'bg-slate-900/50 border-slate-800 text-slate-300 hover:bg-slate-900'
+                : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+            <span className="flex items-center gap-2 whitespace-nowrap">
+              <Zap className={`w-3.5 h-3.5 ${showGoogleOnly ? 'text-cyan-400' : 'text-slate-500'}`} />
               <span>Google AI &amp; VRP Focus</span>
             </span>
             <span className="font-mono text-[11px] text-slate-400 tabular-nums">
@@ -199,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Category Navigation */}
         <div>
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+          <div className="text-xs font-semibold text-slate-300 mb-2">
             Feed Categories
           </div>
           <div className="space-y-0.5">
@@ -210,64 +196,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors text-left ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors text-left ${
                     isActive
-                      ? 'bg-slate-800 text-white font-medium shadow-sm'
+                      ? 'bg-slate-800 text-white'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
-                  <span className="truncate">{cat.label}</span>
+                  <span className="flex items-center gap-2.5 truncate">
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
+                    <span className="truncate">{cat.label}</span>
+                  </span>
+                  {cat.count !== undefined && (
+                    <span className="font-mono text-[11px] text-slate-500 tabular-nums">{cat.count}</span>
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Pipeline Readiness */}
-        <div>
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            Autonomous Pipeline
+        {/* Subsystem Verification Summary */}
+        <div className="pt-2 border-t border-slate-800/80 space-y-2">
+          <div className="text-xs font-semibold text-slate-300">
+            Verification Guarantees
           </div>
-          <div className="text-xs space-y-1.5 p-3 bg-slate-900/60 border border-slate-800/80 rounded-lg">
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Interpreter Engine</span>
-              <span className="text-emerald-400 font-mono text-[11px]">Ready</span>
+          <div className="text-xs space-y-1.5 text-slate-400">
+            <div className="flex items-center justify-between">
+              <span>Consensus Loop</span>
+              <span className="font-mono text-[11px] text-slate-300 tabular-nums">k ≤ 3 Bounded</span>
             </div>
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Code Synthesizer</span>
-              <span className="text-emerald-400 font-mono text-[11px]">Ready</span>
+            <div className="flex items-center justify-between">
+              <span>Receipt Canonicalizer</span>
+              <span className="font-mono text-[11px] text-slate-300">RFC 8785 JCS</span>
             </div>
-            <div className="flex items-center justify-between text-slate-400">
-              <span>QA &amp; SHA-256</span>
-              <span className="text-emerald-400 font-mono text-[11px]">Enforced</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Meta-Learning</span>
-              <span className="text-cyan-400 font-mono text-[11px]">Auto-Refining</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Strategy Engine</span>
-              <span className="text-emerald-400 font-mono text-[11px]">Alpha Maximizer</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Packaged Bundles</span>
-              <span className="text-cyan-400 font-mono text-[11px] tabular-nums">{completedPackagesCount}</span>
+            <div className="flex items-center justify-between">
+              <span>Provenance Spec</span>
+              <span className="font-mono text-[11px] text-emerald-400">SLSA v1.0</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Footer System Status */}
-      <div className="pt-4 border-t border-slate-800/80 text-[11px] text-slate-500 space-y-1">
+      {/* Footer Information */}
+      <div className="pt-4 border-t border-slate-800 text-[11px] text-slate-500 space-y-1">
         <div className="flex items-center justify-between">
-          <span>AI Model Engine</span>
+          <span>Synthesis Model</span>
           <span className="font-mono text-slate-400">gemini-3.8-flash</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>API Key Connection</span>
-          <span className={`font-mono ${hasApiKey ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {hasApiKey ? 'Connected' : 'Autonomous Mode'}
+          <span>Runtime Mode</span>
+          <span className="font-mono text-slate-300">
+            {hasApiKey ? 'Server API Active' : 'Deterministic Engine'}
           </span>
         </div>
       </div>

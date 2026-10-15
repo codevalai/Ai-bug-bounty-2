@@ -235,10 +235,12 @@ export interface TargetEvent {
   isGoogleTarget?: boolean;
   rawText?: string;
   stage: PipelineStage;
+  allowedTech?: string[];
 
   // Enterprise additions
   targetType?: TargetType;
   track?: TargetTrack;
+  targetTrack?: TargetTrack;
   canonicalHash?: string;
   etag?: string;
   lastModified?: string;

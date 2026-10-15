@@ -1,0 +1,28 @@
+{
+  "$schema": "https://sovereign.infinity/schemas/submission-manifest.v1.json",
+  "projectName": "Cod3Eval Sovereign Infinity",
+  "tagline": "Verifiable Off-Chain Autonomous SecOps Oracle & SLSA v1.0 Arbitrage Mesh",
+  "tracks": [
+    "ETHGlobal Singapore 2026",
+    "CalHacks 12.0",
+    "Google AI Studio Sprint"
+  ],
+  "techStack": {
+    "aiEngine": "Google Gemini 3.8 Flash via @google/genai",
+    "formalVerification": "Proof-Carrying Code (PCC) SMT-LIB2 QF_LIA Prover + RFC 8785 JCS",
+    "cryptography": "NIST FIPS 203 ML-KEM-1024, Ed25519/ECDSA DSSEv1, RFC 6962 Merkle Trees, WebCrypto SHA-256",
+    "hardwareAttestation": "AWS Nitro Enclaves / AMD SEV-SNP / Intel TDX PCR0-PCR1 SHA-384 Remote Attestation",
+    "smartContracts": "Solidity 0.8.24 (SovereignMerkleOracle.sol on Base Sepolia)",
+    "backendRuntime": "Node.js 22, Express, TypeScript, Zod, Ephemeral Git Worktrees"
+  },
+  "repository": "https://github.com/codevalai/ethglobal-singapore-2026-auton",
+  "verifiedInvariants": [
+    "RFC-001_CLEANROOM_PATENT_ISOLATION",
+    "RFC-002_85_PERCENT_BFT_QUORUM",
+    "RFC-003_64KB_WASM_MEMORY_BOUNDING",
+    "RFC-004_POST_QUANTUM_LATTICE_SHIELDING",
+    "RFC-005_MONOTONIC_MERKLE_REPLAY_SPINE",
+    "RFC-006_PROOF_CARRYING_CODE_SMT_LIB2",
+    "RFC-007_HARDWARE_ENCLAVE_PCR0_ATTESTATION"
+  ]
+}

@@ -190,22 +190,13 @@ export const StrategyEngineView: React.FC<StrategyEngineViewProps> = ({
       )}
 
       {/* Header Banner */}
-      <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
+      <div className="p-5 bg-slate-900 border border-slate-800 rounded-lg">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
-                <Compass className="w-5 h-5 text-cyan-400" />
-              </div>
-              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Autonomous Strategy Engine</span>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 rounded font-semibold">
-                  Policy Optimizer v1.0
-                </span>
-              </h1>
-            </div>
-            <p className="text-xs text-slate-400 mt-1.5 max-w-2xl leading-relaxed">
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              06. Autonomous Strategy Engine &amp; Portfolio EV Optimizer
+            </h1>
+            <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
               Analyzes historical competition outcomes, liquidity distributions, and archetype win rates
               to recommend maximum-alpha targets and formulate mathematically optimal governance rules for the Policy Engine.
             </p>
@@ -487,10 +478,9 @@ export const StrategyEngineView: React.FC<StrategyEngineViewProps> = ({
             }`}
           >
             <Shield className="w-3.5 h-3.5 text-amber-400" />
-            <span>Policy Engine Blueprint</span>
-            {strategyState.policyRecommendation.ruleDiffs.length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            )}
+            <span>
+              Policy Engine Blueprint ({strategyState.policyRecommendation.ruleDiffs.length})
+            </span>
           </button>
 
           <button
@@ -609,27 +599,30 @@ export const StrategyEngineView: React.FC<StrategyEngineViewProps> = ({
                   {/* Top Row: Rank, Title, Tier Badge, EV */}
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px] font-bold flex items-center justify-center">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono tabular-nums text-slate-400">
+                        <span className="font-bold text-slate-200">
                           #{index + 1}
                         </span>
+                        <span aria-hidden="true">·</span>
                         <span
-                          className={`text-[10px] font-bold uppercase font-mono px-2 py-0.5 rounded border ${
+                          className={`font-semibold uppercase ${
                             rec.tier === 'tier1_alpha'
-                              ? 'bg-amber-950/70 border-amber-500/70 text-amber-300'
+                              ? 'text-amber-300'
                               : rec.tier === 'tier3_bounty'
-                              ? 'bg-emerald-950/70 border-emerald-500/70 text-emerald-300'
+                              ? 'text-emerald-300'
                               : rec.tier === 'tier2_yield'
-                              ? 'bg-cyan-950/70 border-cyan-500/70 text-cyan-300'
-                              : 'bg-purple-950/70 border-purple-500/70 text-purple-300'
+                              ? 'text-cyan-300'
+                              : 'text-purple-300'
                           }`}
                         >
                           {rec.tierLabel}
                         </span>
-                        <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        <span aria-hidden="true">·</span>
+                        <span className="text-slate-300">
                           {rec.platform}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-mono">
+                        <span aria-hidden="true">·</span>
+                        <span className="text-slate-400">
                           {rec.daysRemaining}d remaining
                         </span>
                       </div>

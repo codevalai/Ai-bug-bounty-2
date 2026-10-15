@@ -1,4 +1,5 @@
 import { TargetEvent, PolicyRuleConfig } from '../types/radar';
+import { getBaseGlobalCatalog } from '../services/globalCatalogService';
 
 export const INITIAL_POLICY: PolicyRuleConfig = {
   autoGenerateWhitelistedOnly: true,
@@ -20,7 +21,7 @@ export const INITIAL_POLICY: PolicyRuleConfig = {
   targetStacks: ['TypeScript', 'Node.js', 'Google GenAI SDK', 'Express', 'React', 'Docker'],
 };
 
-export const INITIAL_TARGETS: TargetEvent[] = [
+const CORE_FLAGSHIP_TARGETS: TargetEvent[] = [
   {
     id: 'target-google-vrp-01',
     title: 'Google Bug Hunters: AI Vulnerability Reward Program (AI VRP)',
@@ -1023,3 +1024,9 @@ echo "[PASS] CVE-2026-5821 remediation verified: command injection and path trav
     },
   },
 ];
+
+export const INITIAL_TARGETS: TargetEvent[] = [
+  ...CORE_FLAGSHIP_TARGETS,
+  ...getBaseGlobalCatalog(),
+];
+

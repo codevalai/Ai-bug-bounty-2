@@ -499,10 +499,10 @@ export const CodePipelineView: React.FC<CodePipelineViewProps> = ({
               <img
                 src={githubUser.avatar_url}
                 alt={githubUser.login}
+                referrerPolicy="no-referrer"
                 className="w-4 h-4 rounded-full border border-slate-700"
               />
               <span className="font-mono text-cyan-300">@{githubUser.login}</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
             </button>
           ) : (
             <button

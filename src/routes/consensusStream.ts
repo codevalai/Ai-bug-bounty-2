@@ -21,12 +21,29 @@ export const consensusStreamRouter = Router();
  */
 export const LEDGER_PATH = path.resolve(process.cwd(), 'audit-ledger.jsonl');
 let lastLedgerReceiptDigest = 'sha256:0000000000000000';
+let ledgerHydrated = false;
 
 export function getLastLedgerReceiptDigest(): string {
   return lastLedgerReceiptDigest;
 }
 
 export async function appendAuditLedger(entry: Record<string, unknown>): Promise<string> {
+  if (!ledgerHydrated) {
+    try {
+      const existing = await fsPromises.readFile(LEDGER_PATH, 'utf8');
+      const lines = existing.split('\n').filter((l) => l.trim().length > 0);
+      if (lines.length > 0) {
+        const lastObj = JSON.parse(lines[lines.length - 1]);
+        if (lastObj?.receiptDigest) {
+          lastLedgerReceiptDigest = lastObj.receiptDigest;
+        }
+      }
+    } catch {
+      // File may not exist yet
+    }
+    ledgerHydrated = true;
+  }
+
   const canonicalPayload = {
     ...entry,
     previousReceiptDigest: lastLedgerReceiptDigest,

@@ -25,6 +25,10 @@ import {
 import { playTactileClick, playDeployChime } from '../utils/audio';
 import { downloadDeployableZip } from '../utils/zipPackager';
 import { generateEliteDocumentationSuite, EliteDocFile } from '../utils/eliteDocsGenerator';
+import {
+  buildHackathonProjectBundle,
+  HackathonProjectBundle,
+} from '../services/hackathonPackagerService';
 
 interface SubmissionPackagerViewProps {
   activeTarget: TargetEvent;
@@ -49,7 +53,89 @@ export const SubmissionPackagerView: React.FC<SubmissionPackagerViewProps> = ({
   const [viewingEliteDoc, setViewingEliteDoc] = useState<EliteDocFile | null>(null);
   const [copiedDocContent, setCopiedDocContent] = useState(false);
 
+  // Sponsor Rubric Cross-Reference Bundle State
+  const [hackathonBundle, setHackathonBundle] = useState<HackathonProjectBundle | null>(null);
+  const [isCrossReferencing, setIsCrossReferencing] = useState(false);
+  const [isExportingRubricZip, setIsExportingRubricZip] = useState(false);
+  const [selectedSponsorIdx, setSelectedSponsorIdx] = useState(0);
+
   const eliteDocs = generateEliteDocumentationSuite(activeTarget);
+
+  useEffect(() => {
+    let mounted = true;
+    const runCrossReference = async () => {
+      setIsCrossReferencing(true);
+      try {
+        const res = await fetch('/api/radar/hackathon/package', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: activeTarget, exportFormat: 'json' }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (mounted && data?.bundle) {
+            setHackathonBundle(data.bundle);
+            setSelectedSponsorIdx(0);
+            setIsCrossReferencing(false);
+            return;
+          }
+        }
+      } catch {
+        // Fallback to local deterministic packager if offline
+      }
+      if (mounted) {
+        const localBundle = buildHackathonProjectBundle({
+          targetId: activeTarget.id,
+          title: activeTarget.title,
+          platform: activeTarget.platform,
+          category: activeTarget.category,
+          theme: activeTarget.theme,
+          prizePool: activeTarget.prizePool,
+          prizeAmountUsd: activeTarget.prizeAmountUsd,
+          deadline: activeTarget.deadline,
+          judgingCriteria: activeTarget.spec?.judgingCriteria,
+          allowedTech: activeTarget.spec?.allowedTech,
+        });
+        setHackathonBundle(localBundle);
+        setSelectedSponsorIdx(0);
+        setIsCrossReferencing(false);
+      }
+    };
+    runCrossReference();
+    return () => {
+      mounted = false;
+    };
+  }, [activeTarget.id]);
+
+  const handleExportSponsorRubricZip = async () => {
+    try {
+      playTactileClick();
+      setIsExportingRubricZip(true);
+      const res = await fetch('/api/radar/hackathon/package', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: activeTarget, exportFormat: 'zip' }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${activeTarget.id.toLowerCase().replace(/[^a-z0-9-_]+/g, '-')}-sponsor-bundle.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        playDeployChime();
+      } else {
+        await downloadDeployableZip(activeTarget);
+      }
+    } catch {
+      await downloadDeployableZip(activeTarget);
+    } finally {
+      setIsExportingRubricZip(false);
+    }
+  };
 
   const handleDownloadDeployableZip = async () => {
     try {
@@ -152,22 +238,25 @@ ${activeTarget.githubPushResult ? `- Verified Commit: ${activeTarget.githubPushR
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <div className="text-xs text-slate-400">
-            <span>Target: <strong className="text-slate-200">{activeTarget.title}</strong></span>
+          <div className="text-xs text-slate-400 font-mono tabular-nums">
+            <span>Target: <strong className="text-slate-200 font-sans">{activeTarget.title}</strong></span>
             <span className="mx-2" aria-hidden="true">·</span>
             <span>Platform: {activeTarget.platform}</span>
+            {hackathonBundle && (
+              <>
+                <span className="mx-2" aria-hidden="true">·</span>
+                <span className="text-cyan-400">Rubric Fit: {hackathonBundle.overallRubricScore}%</span>
+                <span className="mx-2" aria-hidden="true">·</span>
+                <span className="text-emerald-400">{hackathonBundle.bundleDigestSha256}</span>
+              </>
+            )}
           </div>
           <h1 className="text-xl font-bold text-white tracking-tight mt-1 flex items-center gap-2">
-            <span>Submission Packager &amp; Pitch Studio</span>
-            {bundle && (
-              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded">
-                Dossier Ready
-              </span>
-            )}
+            <span>Submission Packager &amp; Sponsor Rubric Cross-Reference</span>
           </h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => {
               playTactileClick();
@@ -177,17 +266,30 @@ ${activeTarget.githubPushResult ? `- Verified Commit: ${activeTarget.githubPushR
             className="px-3.5 py-1.5 text-xs font-medium text-slate-200 bg-slate-900 border border-slate-700 hover:bg-slate-800 disabled:opacity-50 rounded-md transition-colors inline-flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{isPackaging ? 'Packaging with Gemini...' : 'Re-Package Submission'}</span>
+            <span>{isPackaging ? 'Packaging with Gemini...' : 'Re-Package Pitch'}</span>
+          </button>
+
+          <button
+            onClick={handleExportSponsorRubricZip}
+            disabled={isExportingRubricZip}
+            className="px-4 py-1.5 text-xs font-semibold text-slate-950 bg-cyan-400 hover:bg-cyan-300 disabled:opacity-50 rounded-md transition-colors inline-flex items-center gap-1.5"
+            title="Calls POST /api/radar/hackathon/package with exportFormat=zip to export complete sponsor-aligned bundle + SLSA v1.0 provenance"
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>
+              {isExportingRubricZip
+                ? 'Packaging Sponsor Bundle...'
+                : 'Export Sponsor-Aligned Bundle (.zip)'}
+            </span>
           </button>
 
           <button
             onClick={handleDownloadDeployableZip}
             disabled={isDownloadingZip}
-            className="px-4 py-1.5 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 rounded-md transition-colors inline-flex items-center gap-1.5 shadow-sm shadow-emerald-900/30"
-            title="Download full deployable ZIP package with code, dockerfile, tests, and elite documentation suite (architecture, security, benchmarks)"
+            className="px-3.5 py-1.5 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 rounded-md transition-colors inline-flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>{isDownloadingZip ? 'Packing ZIP + Elite Docs...' : 'Download Full Deployable ZIP (.zip)'}</span>
+            <span>{isDownloadingZip ? 'Packing ZIP...' : 'Full Deployable ZIP'}</span>
           </button>
 
           {bundle && (
@@ -201,6 +303,146 @@ ${activeTarget.githubPushResult ? `- Verified Commit: ${activeTarget.githubPushR
           )}
         </div>
       </div>
+
+      {/* Sponsor Prize Rubric Cross-Reference Matrix (Powered by POST /api/radar/hackathon/package) */}
+      {hackathonBundle && (
+        <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 bg-slate-950/60 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono tabular-nums">
+              <span className="font-sans font-semibold text-white">
+                Sponsor Prize Rubric Cross-Reference Engine
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="text-cyan-400 font-semibold">
+                Composite Fit: {hackathonBundle.overallRubricScore}%
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="text-emerald-400">
+                Qualified Sponsor Pool: ${hackathonBundle.totalQualifiedSponsorPoolUsd.toLocaleString()}
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-400">
+                Expected Capture EV: ${hackathonBundle.expectedPortfolioValueUsd.toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] font-mono tabular-nums text-slate-400">
+              <span>Merkle Root:</span>
+              <code className="text-cyan-300">{hackathonBundle.merkleRoot.slice(0, 23)}…</code>
+              <button
+                onClick={() => {
+                  playTactileClick();
+                  setViewingEliteDoc({
+                    filename: 'SPONSOR_RUBRIC_ALIGNMENT.md',
+                    path: 'SPONSOR_RUBRIC_ALIGNMENT.md',
+                    title: 'Sponsor Prize Rubric Cross-Reference Matrix',
+                    category: 'architecture',
+                    content: hackathonBundle.rubricMatrixMarkdown,
+                  });
+                }}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded transition-colors inline-flex items-center gap-1"
+              >
+                <Eye className="w-3 h-3" />
+                <span>Inspect Matrix (.md)</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Sponsor Track Selector Tabs */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+              {hackathonBundle.sponsorMatches.map((match, idx) => {
+                const isSelected = idx === selectedSponsorIdx;
+                return (
+                  <button
+                    key={match.sponsorId}
+                    onClick={() => {
+                      playTactileClick();
+                      setSelectedSponsorIdx(idx);
+                    }}
+                    className={`p-3 rounded-lg border text-left transition-all ${
+                      isSelected
+                        ? 'bg-slate-950 border-cyan-500/60'
+                        : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
+                      <span className="text-emerald-400 font-semibold">
+                        ${match.trackPrizeUsd.toLocaleString()}
+                      </span>
+                      <span className="text-cyan-400 font-bold">{match.overallFitScore}% Fit</span>
+                    </div>
+                    <div className="text-xs font-semibold text-white mt-1 line-clamp-1">
+                      {match.sponsorName}
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                      {match.trackTitle}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active Sponsor Track Criterion Breakdown Table */}
+            {hackathonBundle.sponsorMatches[selectedSponsorIdx] && (
+              <div className="space-y-3">
+                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded text-xs text-slate-300 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-cyan-400 font-semibold mr-2">Tailored Pitch Hook:</span>
+                    <span>{hackathonBundle.sponsorMatches[selectedSponsorIdx].tailoredPitchHook}</span>
+                  </div>
+                  <span className="font-mono text-[11px] text-emerald-400 whitespace-nowrap tabular-nums">
+                    Expected EV: $
+                    {hackathonBundle.sponsorMatches[
+                      selectedSponsorIdx
+                    ].expectedCaptureValueUsd.toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-800 rounded-lg">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-mono text-slate-400">
+                        <th className="py-2 px-3">Rubric Criterion</th>
+                        <th className="py-2 px-3">Weight</th>
+                        <th className="py-2 px-3">Fit Score</th>
+                        <th className="py-2 px-3">Concrete Architectural Subsystem</th>
+                        <th className="py-2 px-3">Verification Evidence</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/70">
+                      {hackathonBundle.sponsorMatches[selectedSponsorIdx].criterionBreakdowns.map(
+                        (item, i) => (
+                          <tr key={i} className="hover:bg-slate-950/40">
+                            <td className="py-2.5 px-3 font-medium text-slate-200">
+                              <div>{item.criterion}</div>
+                              <div className="text-[11px] text-slate-400 font-normal mt-0.5">
+                                {item.justification}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono tabular-nums text-slate-400">
+                              {item.weightPercent}%
+                            </td>
+                            <td className="py-2.5 px-3 font-mono tabular-nums font-semibold text-emerald-400">
+                              {item.alignmentScore}/100
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-[11px] text-cyan-300">
+                              {item.architecturalSubsystem}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-[11px] text-amber-300">
+                              {item.verificationArtifact}
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {bundle ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
